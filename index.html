@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Tele2 Villafiber – Löneräknare</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#eef2ff,#f5f3ff);min-height:100vh;padding:16px}
+.wrap{max-width:680px;margin:0 auto}
+h1{color:#4338ca;font-size:1.5rem;text-align:center}
+.sub{color:#6b7280;font-size:.85rem;text-align:center;margin-top:4px;margin-bottom:12px}
+.warn{background:#fffbeb;border:1px solid #fcd34d;border-radius:12px;padding:12px 16px;display:flex;gap:10px;align-items:flex-start;margin-bottom:14px}
+.warn p{color:#92400e;font-size:.78rem;line-height:1.5}
+.card{background:#fff;border-radius:16px;border:1px solid #f3f4f6;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card-header{padding:12px 16px;font-size:.85rem;font-weight:600}
+.card-header.indigo{background:#4338ca;color:#fff}
+.card-header.purple{background:#7c3aed;color:#fff}
+.row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #f9fafb}
+.row:last-child{border-bottom:none}
+.row-label{flex:1}
+.row-label .name{font-size:.85rem;font-weight:500;color:#1f2937}
+.row-label .meta{font-size:.74rem;color:#9ca3af;margin-top:2px;display:flex;flex-wrap:wrap;gap:3px}
+input[type=number]{width:72px;border:1px solid #e5e7eb;border-radius:8px;padding:6px 8px;font-size:.85rem;text-align:center;outline:none}
+input[type=number]:focus{border-color:#818cf8;box-shadow:0 0 0 2px #e0e7ff}
+.amt{width:110px;text-align:right;font-size:.85rem;font-weight:600;color:#4338ca}
+.tier-pill{display:inline-flex;padding:2px 7px;border-radius:20px;font-size:.72rem;background:#f3f4f6;color:#6b7280;margin:2px}
+.tier-pill.active{background:#4338ca;color:#fff}
+.section-divider{padding:6px 16px;background:#f9fafb;font-size:.72rem;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;border-top:1px solid #f3f4f6}
+.toggle-btn{padding:8px 14px;border-radius:10px;font-size:.78rem;font-weight:600;cursor:pointer;border:1px solid;display:inline-flex;align-items:center;gap:6px;transition:.15s}
+.green-off{border-color:#86efac;background:#fff;color:#15803d}
+.green-on{border-color:#16a34a;background:#16a34a;color:#fff}
+.blue-off{border-color:#93c5fd;background:#fff;color:#1d4ed8}
+.blue-on{border-color:#2563eb;background:#2563eb;color:#fff}
+.dot{width:10px;height:10px;border-radius:50%;border:2px solid currentColor;display:inline-block}
+.bonus-wrap{padding:12px 16px}
+.bonus-wrap p{font-size:.74rem;color:#9ca3af;font-weight:600;margin-bottom:8px;text-transform:uppercase}
+.bonus-btns{display:flex;flex-wrap:wrap;gap:8px}
+.sum-row{display:flex;justify-content:space-between;font-size:.85rem;padding:4px 0}
+.sum-row .lbl{color:#6b7280}.sum-row .val{font-weight:500}
+.sum-row .val.red{color:#ef4444}.sum-row .val.green{color:#16a34a}
+.sum-total{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px;border-top:1px solid #f3f4f6}
+.sum-total .lbl{font-weight:700;color:#1f2937}.sum-total .val{font-size:1.2rem;font-weight:800;color:#4338ca}
+.anger-wrap{padding:14px 16px}
+.anger-wrap label{font-size:.85rem;font-weight:600;color:#374151;display:block;margin-bottom:8px}
+.anger-inner{display:flex;align-items:center;gap:12px}
+.anger-note{font-size:.82rem;color:#ef4444;font-weight:500}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useMemo}=React;
+function fmt(n){return n.toLocaleString("sv-SE",{minimumFractionDigits:2,maximumFractionDigits:2})+" kr"}
+function avgComm(arr){if(!arr.length)return 0;return arr.reduce((s,c)=>s+c.commission,0)/arr.length}
+function getTierRate(qty,tiers){let r=tiers[0].rate;for(const t of tiers){if(qty>=t.min)r=t.rate;}return r;}
+
+const TIERS=[{min:1,rate:325},{min:25,rate:375},{min:50,rate:425},{min:75,rate:475},{min:100,rate:500},{min:120,rate:525}];
+const TILLVAL=[
+  {id:"tv1",name:"Familjeabonnemang",commission:250},{id:"tv2",name:"V Series & Film 24 mån",commission:250},
+  {id:"tv3",name:"V Series & Film 12 mån",commission:150},{id:"tv4",name:"V Premium 24mån",commission:400},
+  {id:"tv5",name:"V Premium 12mån",commission:200},{id:"tv6",name:"V Sport 24mån",commission:300},
+  {id:"tv7",name:"V Sport 12mån",commission:150},{id:"tv8",name:"V Omteck",commission:75},
+  {id:"tv9",name:"V 0mån",commission:25},{id:"tv10",name:"TV4 Sport Max 24mån",commission:300},
+  {id:"tv11",name:"TV4 Sport Max 12mån",commission:150},{id:"tv12",name:"TV4 Sport Stor 24mån",commission:250},
+  {id:"tv13",name:"TV4 Sport Stor 12mån",commission:150},{id:"tv14",name:"TV4 Film & Serier 12/24mån",commission:50},
+  {id:"tv15",name:"TV4 0mån",commission:25},{id:"tv16",name:"Syskonabonnemang",commission:50},
+  {id:"tv17",name:"Telefoni",commission:100},{id:"tv18",name:"Omteck",commission:125},
+];
+const TILLVAL_AVG=avgComm(TILLVAL);
+
+function App(){
+  const [sales,setSales]=useState({});
+  const [anger,setAnger]=useState("");
+  const [greenBonus,setGreenBonus]=useState(false);
+  const [angerBonus,setAngerBonus]=useState(false);
+  function q(id){return parseInt(sales[id])||0;}
+  function setSale(id,val){setSales(p=>({...p,[id]:val}));}
+
+  const prodQty=q("produkt");
+  const bonusPerUnit=(greenBonus?25:0)+(angerBonus?25:0);
+  const rate=prodQty>0?getTierRate(prodQty,TIERS)+bonusPerUnit:0;
+  const tillvalQty=q("tillval");
+
+  const gross=useMemo(()=>prodQty*rate+tillvalQty*TILLVAL_AVG,[prodQty,rate,tillvalQty]);
+  const angerPct=parseFloat(anger)||0;
+  const angerDed=gross*(angerPct/100);
+  const afterAnger=gross-angerDed;
+  const holiday=afterAnger*0.12;
+  const total=afterAnger+holiday;
+
+  return(
+    <div className="wrap">
+      <h1>Tele2 Villafiber</h1>
+      <p className="sub">Löneräknare</p>
+      <div className="warn"><span>⚠️</span><p>Lönen beräknas utifrån <strong>snittprovision</strong> för tillval. Den faktiska lönen kan skilja sig beroende på exakt vilka tillval som sålts.</p></div>
+
+      <div className="card">
+        <div className="bonus-wrap">
+          <p>Bonusar — klicka för att aktivera</p>
+          <div className="bonus-btns">
+            <button className={"toggle-btn "+(greenBonus?"green-on":"green-off")} onClick={()=>setGreenBonus(v=>!v)}>
+              <span className="dot" style={greenBonus?{background:"#fff",borderColor:"#fff"}:{}}></span>🟢 Grön kampanj bonus? (+25 kr/produkt)
+            </button>
+            <button className={"toggle-btn "+(angerBonus?"blue-on":"blue-off")} onClick={()=>setAngerBonus(v=>!v)}>
+              <span className="dot" style={angerBonus?{background:"#fff",borderColor:"#fff"}:{}}></span>✅ Ånger under 15%? (+25 kr/produkt)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header indigo">Fyll i antal sålda</div>
+        <div className="row">
+          <div className="row-label">
+            <div className="name">Produkt</div>
+            <div className="meta">
+              {TIERS.map((t,i)=>{const active=prodQty>=t.min&&(i===TIERS.length-1||prodQty<TIERS[i+1].min);return <span key={i} className={"tier-pill"+(active?" active":"")}>{t.min}+: {t.rate}{bonusPerUnit>0?"+"+bonusPerUnit:""} kr</span>})}
+            </div>
+          </div>
+          <input type="number" min="0" placeholder="0" value={sales["produkt"]||""} onChange={e=>setSale("produkt",e.target.value)}/>
+          <div className="amt">{fmt(prodQty*rate)}</div>
+        </div>
+        <div className="section-divider">Tillval (räknas ej in i trappa)</div>
+        <div className="row">
+          <div className="row-label">
+            <div className="name">Tillval</div>
+            <div className="meta">Snittprovision: {TILLVAL_AVG.toLocaleString("sv-SE",{maximumFractionDigits:0})} kr ({TILLVAL.length} tillval)</div>
+          </div>
+          <input type="number" min="0" placeholder="0" value={sales["tillval"]||""} onChange={e=>setSale("tillval",e.target.value)}/>
+          <div className="amt">{fmt(tillvalQty*TILLVAL_AVG)}</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="anger-wrap">
+          <label>Ångerprocent (%)</label>
+          <div className="anger-inner">
+            <input type="number" min="0" max="100" step="0.1" placeholder="0.0" value={anger} onChange={e=>setAnger(e.target.value)} style={{width:"120px"}}/>
+            {angerPct>0&&<span className="anger-note">−{fmt(angerDed)}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header purple">Sammanställning</div>
+        <div style={{padding:"16px"}}>
+          <div className="sum-row"><span className="lbl">Bruttoprovision</span><span className="val">{fmt(gross)}</span></div>
+          {angerPct>0&&<div className="sum-row"><span className="lbl">Ångeravdrag ({angerPct}%)</span><span className="val red">−{fmt(angerDed)}</span></div>}
+          <div className="sum-row"><span className="lbl">Provision efter ånger</span><span className="val">{fmt(afterAnger)}</span></div>
+          <div className="sum-row"><span className="lbl">Semesterersättning (12%)</span><span className="val green">{fmt(holiday)}</span></div>
+          <div className="sum-total"><span className="lbl">Uppskattad lön</span><span className="val">{fmt(total)}</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
