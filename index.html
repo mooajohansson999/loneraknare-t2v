@@ -38,15 +38,15 @@ input[type=number]:focus{border-color:#818cf8;box-shadow:0 0 0 2px #e0e7ff}
 .bonus-wrap{padding:12px 16px}
 .bonus-wrap p{font-size:.74rem;color:#9ca3af;font-weight:600;margin-bottom:8px;text-transform:uppercase}
 .bonus-btns{display:flex;flex-wrap:wrap;gap:8px}
+.netto-note{font-size:.74rem;color:#6366f1;margin-top:4px;font-weight:500}
 .sum-row{display:flex;justify-content:space-between;font-size:.85rem;padding:4px 0}
 .sum-row .lbl{color:#6b7280}.sum-row .val{font-weight:500}
-.sum-row .val.red{color:#ef4444}.sum-row .val.green{color:#16a34a}
+.sum-row .val.green{color:#16a34a}
 .sum-total{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px;border-top:1px solid #f3f4f6}
 .sum-total .lbl{font-weight:700;color:#1f2937}.sum-total .val{font-size:1.2rem;font-weight:800;color:#4338ca}
 .anger-wrap{padding:14px 16px}
 .anger-wrap label{font-size:.85rem;font-weight:600;color:#374151;display:block;margin-bottom:8px}
 .anger-inner{display:flex;align-items:center;gap:12px}
-.anger-note{font-size:.82rem;color:#ef4444;font-weight:500}
 </style>
 </head>
 <body>
@@ -80,22 +80,23 @@ function App(){
   function setSale(id,val){setSales(p=>({...p,[id]:val}));}
 
   const prodQty=q("produkt");
+  const angerPct=parseFloat(anger)||0;
+  const nettoQty=Math.floor(prodQty*(1-angerPct/100));
   const bonusPerUnit=(greenBonus?25:0)+(angerBonus?25:0);
-  const rate=prodQty>0?getTierRate(prodQty,TIERS)+bonusPerUnit:0;
+  const rate=nettoQty>0?getTierRate(nettoQty,TIERS)+bonusPerUnit:0;
   const tillvalQty=q("tillval");
 
-  const gross=useMemo(()=>prodQty*rate+tillvalQty*TILLVAL_AVG,[prodQty,rate,tillvalQty]);
-  const angerPct=parseFloat(anger)||0;
-  const angerDed=gross*(angerPct/100);
-  const afterAnger=gross-angerDed;
-  const holiday=afterAnger*0.12;
-  const total=afterAnger+holiday;
+  const productGross=nettoQty*rate;
+  const tillvalGross=tillvalQty*TILLVAL_AVG;
+  const gross=productGross+tillvalGross;
+  const holiday=gross*0.12;
+  const total=gross+holiday;
 
   return(
     <div className="wrap">
       <h1>Tele2 Villafiber</h1>
       <p className="sub">Löneräknare</p>
-      <div className="warn"><span>⚠️</span><p>Lönen beräknas utifrån <strong>snittprovision</strong> för tillval. Den faktiska lönen kan skilja sig beroende på exakt vilka tillval som sålts.</p></div>
+      <div className="warn"><span>⚠️</span><p>Lönen beräknas utifrån <strong>snittprovision</strong> för tillval. Trappan baseras på antal sålda produkter <strong>netto</strong> efter ånger.</p></div>
 
       <div className="card">
         <div className="bonus-wrap">
@@ -117,11 +118,12 @@ function App(){
           <div className="row-label">
             <div className="name">Produkt</div>
             <div className="meta">
-              {TIERS.map((t,i)=>{const active=prodQty>=t.min&&(i===TIERS.length-1||prodQty<TIERS[i+1].min);return <span key={i} className={"tier-pill"+(active?" active":"")}>{t.min}+: {t.rate}{bonusPerUnit>0?"+"+bonusPerUnit:""} kr</span>})}
+              {TIERS.map((t,i)=>{const active=nettoQty>=t.min&&(i===TIERS.length-1||nettoQty<TIERS[i+1].min);return <span key={i} className={"tier-pill"+(active?" active":"")}>{t.min}+: {t.rate}{bonusPerUnit>0?"+"+bonusPerUnit:""} kr</span>})}
             </div>
+            {angerPct>0&&prodQty>0&&<div className="netto-note">Netto efter ånger: {nettoQty} st → {rate} kr/st</div>}
           </div>
           <input type="number" min="0" placeholder="0" value={sales["produkt"]||""} onChange={e=>setSale("produkt",e.target.value)}/>
-          <div className="amt">{fmt(prodQty*rate)}</div>
+          <div className="amt">{fmt(productGross)}</div>
         </div>
         <div className="section-divider">Tillval (räknas ej in i trappa)</div>
         <div className="row">
@@ -130,7 +132,7 @@ function App(){
             <div className="meta">Snittprovision: {TILLVAL_AVG.toLocaleString("sv-SE",{maximumFractionDigits:0})} kr ({TILLVAL.length} tillval)</div>
           </div>
           <input type="number" min="0" placeholder="0" value={sales["tillval"]||""} onChange={e=>setSale("tillval",e.target.value)}/>
-          <div className="amt">{fmt(tillvalQty*TILLVAL_AVG)}</div>
+          <div className="amt">{fmt(tillvalGross)}</div>
         </div>
       </div>
 
@@ -139,7 +141,7 @@ function App(){
           <label>Ångerprocent (%)</label>
           <div className="anger-inner">
             <input type="number" min="0" max="100" step="0.1" placeholder="0.0" value={anger} onChange={e=>setAnger(e.target.value)} style={{width:"120px"}}/>
-            {angerPct>0&&<span className="anger-note">−{fmt(angerDed)}</span>}
+            {angerPct>0&&<span style={{fontSize:".78rem",color:"#6366f1",fontWeight:500}}>Påverkar trappnivån</span>}
           </div>
         </div>
       </div>
@@ -147,9 +149,8 @@ function App(){
       <div className="card">
         <div className="card-header purple">Sammanställning</div>
         <div style={{padding:"16px"}}>
-          <div className="sum-row"><span className="lbl">Bruttoprovision</span><span className="val">{fmt(gross)}</span></div>
-          {angerPct>0&&<div className="sum-row"><span className="lbl">Ångeravdrag ({angerPct}%)</span><span className="val red">−{fmt(angerDed)}</span></div>}
-          <div className="sum-row"><span className="lbl">Provision efter ånger</span><span className="val">{fmt(afterAnger)}</span></div>
+          <div className="sum-row"><span className="lbl">Provision produkter (netto)</span><span className="val">{fmt(productGross)}</span></div>
+          <div className="sum-row"><span className="lbl">Provision tillval</span><span className="val">{fmt(tillvalGross)}</span></div>
           <div className="sum-row"><span className="lbl">Semesterersättning (12%)</span><span className="val green">{fmt(holiday)}</span></div>
           <div className="sum-total"><span className="lbl">Uppskattad lön</span><span className="val">{fmt(total)}</span></div>
         </div>
